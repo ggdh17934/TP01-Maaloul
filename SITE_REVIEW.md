@@ -1,12 +1,12 @@
 # The Quotations Page: HTML and access review
 
-Checked on 3 October 2026. Website selected by the user for TP1. Current collection target: 1,050 distinct quotation records, with author names and author-page URLs. Requests are sequential, with a three-second delay. The user subsequently authorized implementation after reviewing the detailed plan.
+Initially checked on 3 October 2026. On 6 October, the user revised collection to the first page of at least 1,050 different authors, extracting every quotation on those first pages and validating at least 1,050 distinct records. Requests remain sequential with a three-second delay. These access observations are historical; each run rechecks robots rules.
 
 ## Result
 
 The tested pages are straightforward to parse and accessible through ordinary HTTP GET requests. They returned their quotation content directly in HTML without requiring login or JavaScript execution. No CAPTCHA, JavaScript challenge, 403 response, or 429 response was observed in the limited sample.
 
-This is evidence of suitability for a simple HTML scraper, not proof that the site has no anti-abuse controls or rate limits. No stress test, bypass, or bulk scrape was performed.
+The initial sample was evidence of suitability for a simple HTML scraper, not proof that the site has no anti-abuse controls or rate limits. No stress testing or bypass was attempted; the later authorized collection is recorded below.
 
 The site's robots rules do not disallow the selected quote paths for the descriptive project User-Agent used in the checks. Its FAQ separately limits copying large portions of the site and asks users to contact the owner for reuse permission. Technical access does not resolve that reuse restriction.
 
@@ -56,19 +56,25 @@ The site's [FAQ, Copyright Issues, question 1](https://www.quotationspage.com/fa
 
 Its [About page](https://www.quotationspage.com/about.html) also distinguishes individual quotations from its protected compilations. Do not treat access allowed by robots.txt as permission to redistribute a 2,000-quote compilation. A large CSV submitted to GitHub should account for the owner's stated restriction, ideally through explicit permission for that use. No message has been sent to the owner.
 
-## Proposed collection design after review
+## Revised collection design
 
-1. Start from the [author index](https://www.quotationspage.com/quotes/), using the featured author list or the A-Z letter indexes to discover author names and URLs.
+1. Read A-Z letter indexes to discover author names and URLs in index order.
 2. Select authors in their displayed order. Keep each selected name and its actual author-page URL in an internal list; no separate author export is needed.
-3. Visit an author's first page, collect its quotes, and follow every `Next Page` link until that author's collection ends.
-4. Continue selecting authors until at least 1,050 distinct quote texts have been collected. Finish the current author rather than cutting off midway, so the final number may be slightly above the target.
-5. Remove repeated quote IDs/URLs and exact normalized quote-text repeats. Do not fabricate rows or automatically merge similar wording.
+3. Select at least 1,050 distinct author URLs and visit only each author's first quotation page. Ignore Next Page links.
+4. Extract every quotation on those first pages. If fewer than 1,050 distinct records remain, collect additional author first pages.
+5. Remove repeated quote URLs and texts equivalent after Unicode, case, whitespace, and punctuation normalization. Do not fabricate rows or automatically merge different wording.
 6. Export using pandas and validate the number of CSV records, excluding the header.
 
 Final planned quote columns: `quote`, `author`, `author_url`, and `quote_url`. Quote IDs may be used internally for deduplication. Reference, subject, date, and timestamp columns are outside the agreed minimal dataset. The detailed Q1-Q4 sequence and submission plan are in `PROJECT_PLAN.md`.
 
-A target of 1,050 quotes would require at least 53 quote pages if every page were full with 20 records. Many authors have fewer quotes, and duplicates reduce the usable count, so this is a lower-bound planning estimate, not a measured runtime or page total. Reading the entire alphabetical author list before choosing authors is optional; beginning with the featured list may require fewer requests.
+The revised target requires at least 1,050 author first pages, plus letter indexes and robots.txt on a fresh run. Three-second request intervals alone take roughly 53 minutes before download time and retries. Completed HTML is cached locally under the ignored tmp/first-page-cache/ directory to resume an interrupted run.
 
-The PDF's wording about “all pages” remains a scope question. This proposed run collects every quotation page for the selected authors, not the whole website. State that boundary in the final README.
+The PDF's wording about “all pages” remains a scope question. This run collects only each selected author's first page, not their complete collections or the whole website. The PDF requires at least 1,000 CSV rows, not 1,000 downloaded pages. State the revised boundary in README.
 
 **Implementation and GitHub submission have been authorized.** This document records the earlier suitability checks. See `README.md` for the implemented Q1-Q4 workflow and completed live-run results. The user selected the private `ggdh17934/TP01-Maaloul` repository for submission on 6 October 2026.
+
+## Completed first-page collection — 6 October 2026
+
+The revised run downloaded six letter indexes (A–F) and 1,050 distinct author first pages, with 1,057 HTTP requests including robots.txt and no cache reuse. The robot rules were rechecked and the three-second interval retained. No challenge or HTTP failure stopped the run. All 1,050 final response URLs were distinct first-page paths; no continuation or individual quote pages were requested.
+
+All 3,249 source quotation blocks were extracted. After removing 14 repeated records, pandas saved and validated 3,235 CSV rows. Every saved field and the complete ordering matched the downloaded HTML. The actual runtime was 3,428.2 seconds. Full details are recorded in README.md.

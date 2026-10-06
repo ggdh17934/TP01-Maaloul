@@ -2,105 +2,101 @@
 
 University of Eloued — second-year Master IA & Data Science, Big Data Analytics, 2026/2027.
 
-This program collects quotations from [The Quotations Page](https://www.quotationspage.com/quotes/), keeping each quotation with its author and source links. It follows the four questions in the assignment and aims for at least **1,050 distinct records**, exceeding the required 1,000 rows.
+The program visits the **first quotation page of at least 1,050 different authors**, extracts **every quotation on those first pages**, and saves a validated CSV using pandas. Authors are discovered through [The Quotations Page's A–Z indexes](https://www.quotationspage.com/quotes/).
 
-## Setup
+There are two independent targets: `AUTHOR_TARGET = 1050` author first pages and `TARGET = 1050` distinct quotation records. The PDF requires at least **1,000 CSV rows**, excluding the header; it does not require 1,000 website pages. The author-page target is the user's chosen collection scope.
+
+## Setup and run
 
 Use Python 3.x. The verified environment uses Python 3.13; the pinned pandas version requires Python 3.11 or newer.
 
 From this project's folder in PowerShell:
 
-```powershell
+~~~powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-The required external libraries are Requests, BeautifulSoup, and pandas. No browser automation or JavaScript execution is needed for the tested page layout.
-
-## Run
-
-```powershell
 .\.venv\Scripts\python.exe main.py
-```
+~~~
 
-The program displays complete HTML on standard output, as required by Q1. Progress and the final validation result appear on standard error. Expect substantial terminal output and a run lasting several minutes: requests are sequential and have a minimum three-second pause after each response.
+If the environment is already installed, use only the last command. Requests downloads pages, BeautifulSoup parses HTML, and pandas writes and checks the CSV.
 
-`quotes.csv` is written beside `main.py`, even when the program is launched from another folder. The program finishes all pages for the last selected author, so the result can exceed 1,050 records.
+Complete HTML is printed to standard output; progress goes to standard error. Expect substantial terminal output. A fresh collection takes roughly an hour or longer: 1,050 author pages alone involve about 53 minutes of three-second request intervals, before indexes, download time, redirects, and retries.
 
-The constants `TARGET`, `DELAY`, and `USER_AGENT` are near the top of `main.py`. The agreed defaults are 1,050 records, three seconds, and a descriptive project crawler name. Adjust the target only if the collection requirement changes.
+## Q1 — discover authors, fetch first pages, and display HTML
 
-## Q1 — fetch the pages and display their HTML
+Fetch robots.txt and check the applicable rules using a descriptive User-Agent. Read letter indexes in A–Z order and author links in HTML order, skipping repeated URLs and normalizing trailing slashes. Stop initial discovery once 1,050 authors are selected.
 
-Requests downloads the site's robots file and checks its rules. It then downloads the featured author index and displays its full HTML.
+Download the first quotation page of each selected author, print its full HTML, and retain it for Q2. Do not follow Next Page or Next Author; do not fetch individual quotation details or biographies. Requests are sequential, with at least three seconds after a response before another request starts. Temporary failures have bounded retries; rate-limit responses respect Retry-After. Disallowed paths, detected challenges, and unexpected response types stop the run.
 
-The program reads author names, actual author-page URLs, and advertised quotation counts in displayed order. These counts estimate an initial selection; the actual usable record count is established later. It downloads every quotation page for the selected authors, follows the site's “Next Page” links, and displays each page's full HTML.
+**Collection boundary:** first pages of selected authors. This does not collect every page of the website or every quotation by an author with continuation pages. The PDF's phrase “all pages” is broader than this chosen subset; teacher acceptance of that boundary has not been established. Q2 extracts every quotation on the pages actually collected.
 
-There is one network request at a time, with a three-second pause. HTTP errors are reported. Temporary failures have bounded retries; rate-limit responses honor `Retry-After`. Disallowed paths, pagination loops, and bot challenges stop the run.
+### Resume a long collection
 
-**Collection boundary:** “all pages” means every quotation page for the selected authors. The program does not crawl the entire domain. An author's biography, individual quote detail pages, other linked collections, advertisements, and external websites are outside the collection.
+Downloaded HTML is cached under `tmp/first-page-cache/`. A rerun rechecks robots, reuses completed pages, prints their full HTML again, and downloads missing pages. The final summary separates newly downloaded pages from cache reuse. A cached page is not counted as a new HTTP request.
 
-## Q2 — extract all quotes with BeautifulSoup
+The cache is temporary, excluded from GitHub, and may reflect an earlier website version. For a fresh collection, remove only that cache folder before running. Do not run multiple copies concurrently. CSV replacement occurs after a complete temporary CSV is written.
 
-BeautifulSoup parses the fetched HTML using Python's built-in HTML parser. Each `dt.quote` provides quotation text and a detail link; its associated `dd.author` supplies the author's name from bold text.
+## Q2 — extract every quotation on each first page
 
-This keeps quotations separate from navigation, icons, references, and related links. Whitespace is cleaned without removing punctuation or accents. Repeated quote URLs and exact normalized quotation-text repeats are removed, keeping their first occurrence. Author order, page order, and quote order are preserved.
+BeautifulSoup reads each page with Python's built-in HTML parser. `dt.quote` contains the quotation link and full text; the associated `dd.author` supplies the bold author attribution. Navigation, icons, references, and related links are excluded. Missing attribution or an unexpected layout stops the run.
 
-A missing author or unexpected quotation layout produces a clear error instead of silently pairing a quotation with the wrong attribution. The program displays three sample records after extraction.
+Saved wording and punctuation are preserved while whitespace and Unicode are cleaned. Deduplication removes repeated quote URLs and texts equivalent after Unicode normalization, case folding, whitespace normalization, and punctuation removal. The first occurrence is retained in collection order. Different wording, even very similar wording, remains distinct; this is not semantic deduplication.
 
-## Q3 — save the results using pandas
+Author names repeat because an author can have multiple quotations. One CSV row represents one quotation, not one author. Attribution capitalization can vary; author URLs identify visited pages.
 
-pandas creates `quotes.csv` with these columns:
+## Q3 — save using pandas
+
+`quotes.csv` is written beside main.py with these columns:
 
 | Column | Meaning |
 | --- | --- |
-| `quote` | Complete cleaned quotation text |
-| `author` | Author name displayed by the website |
-| `author_url` | Author's quotation-page URL |
-| `quote_url` | Individual quotation URL |
+| quote | Complete cleaned quotation text |
+| author | Attribution displayed on the quotation page |
+| author_url | Author's first quotation-page URL |
+| quote_url | Individual quotation link, retained without downloading it |
 
-The CSV uses UTF-8 with a byte-order mark for convenient opening in Windows spreadsheet applications. It has a header and no extra DataFrame index column. pandas handles embedded commas and quotation marks.
+pandas handles commas and quotation marks. The CSV has a header, no DataFrame index column, and UTF-8 with a byte-order mark for Windows spreadsheet applications.
 
-## Q4 — ensure at least 1,000 rows
+## Q4 — reopen and validate
 
-The program reopens the saved CSV with pandas, checks its columns and record count, and verifies non-empty values, unique quotations, and source-link formats. The header is excluded from the record count.
+Read the CSV back with pandas. Check its columns, exact count, non-empty fields, unique normalized quotation texts, unique quote URLs, and expected source-link formats. Check at least 1,050 distinct author first-page visits and ensure every saved author URL belongs to that visit list.
 
-If the result has fewer than 1,050 distinct records, the program selects another author, completes that author's pages, and repeats Q1–Q4. Alphabetical author indexes are available if the featured list is exhausted. It never pads the dataset with duplicated or fabricated quotations.
+If fewer than 1,050 distinct quotations remain, collect another author's first page and repeat Q1–Q4. Never fabricate records. An author may disappear from the final CSV if every quotation on its first page duplicates an earlier record; that does not undo its page visit.
 
-A successful run ends with `Complete:` and the actual record, author, page, and request counts. A failed or interrupted run exits with a nonzero status; an existing CSV from an earlier export may be below the target and should not be presented as a successful new run.
+A successful run ends with Complete and the actual quotation, author-page, HTML-page, request, cache, and elapsed-time counts. Failed or interrupted runs exit with a nonzero status. An older or below-target CSV is not proof of successful new collection.
 
 ## Verification
 
-Focused checks cover author discovery, same-author pagination, correct attribution pairing, missing attributions, deduplication order, and CSV handling of commas, quotation marks, and Unicode.
-
-```powershell
+~~~powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
-```
+~~~
 
-The first live run completed on **3 October 2026**:
+**Eight focused tests passed**, covering first-page-only behavior despite Next Page links, completing the author target despite enough rows already existing, discovery order and URL deduplication, all-quote extraction, missing attributions, punctuation-insensitive deduplication, cache reuse with robots checks, and CSV validation.
 
-| Check | Result |
+The live collection completed successfully on **6 October 2026**:
+
+| Check | Verified result |
 | --- | --- |
-| CSV data records | **1,064** |
-| Completed authors | **30** |
-| HTML pages fetched | **68** (one featured index and 67 quotation pages) |
-| HTTP requests | **69**, including robots.txt |
-| Duplicate quotation texts | **0** |
+| Distinct author first pages visited | **1,050** |
+| Letter indexes fetched | **6**, A through F |
+| HTML pages downloaded and fully printed | **1,056** |
+| HTTP requests, including robots.txt | **1,057** |
+| Cached pages reused during this collection | **0** |
+| Quotations extracted from source blocks | **3,249** |
+| Repeated records removed | **14** |
+| CSV data records, excluding header | **3,235** |
+| Author-page URLs represented after deduplication | **1,048** |
 | Empty required fields | **0** |
-| Focused tests | **4 passed** |
+| Repeated normalized quote texts or quote URLs | **0** |
+| Focused tests | **8 passed** |
+| Collection time | **3,428.2 seconds**, about **57 minutes 8 seconds** |
 
-pandas reopened and validated the CSV. All saved records and their order were also compared with the HTML captured during that run; they matched. The run covered all 15 John Adams records, all 232 Bible records, and all 27 Ellen DeGeneres records among the selected authors.
+Every saved field and the entire record order were compared with the downloaded source HTML and matched. The count of quotation blocks matched all 3,249 extracted records. All 1,050 final author response URLs were distinct and stayed on the requested first-page paths. Two author pages have no retained CSV row because their quotations duplicated records collected earlier; all 1,050 pages were still visited and extracted.
 
-During development, standard output was redirected to `tmp/html-output.log` and progress to `tmp/run-progress.log`. The default run command above displays the full HTML directly in the terminal. These temporary logs are excluded from GitHub submission.
+Development captures HTML in `tmp/first-pages-html.log` and progress in `tmp/first-pages-progress.log`. The normal run command prints complete HTML in the terminal. Logs, caches, and the local Python environment are excluded from submission.
 
-## Files and submission
+## GitHub submission and source
 
-- `main.py`: program, with Q1–Q4 labeled in order.
-- `requirements.txt`: tested library versions.
-- `quotes.csv`: generated and validated dataset.
-- `tests/test_main.py`: focused verification checks.
-- `PROJECT_PLAN.md`, `SITE_REVIEW.md`: agreed plan and website inspection.
-- Original PDF: assignment reference.
+The project is submitted to the private [ggdh17934/TP01-Maaloul](https://github.com/ggdh17934/TP01-Maaloul) repository. It includes the program, validated CSV, tests, requirements, documentation, .gitignore, and original PDF. Teacher access is a separate user-managed step.
 
-The assignment requires submission through the student's GitHub account. The submission repository is [ggdh17934/TP01-Maaloul](https://github.com/ggdh17934/TP01-Maaloul), a private repository containing the program, validated CSV, tests, documentation, and original assignment PDF. The local environment, temporary HTML logs, and Python caches are excluded through `.gitignore`.
-
-The site is acknowledged as the source. Its [FAQ](https://www.quotationspage.com/faq.php) describes restrictions on copying large portions; the original quotations and the site's compilation should not be represented as this project's original work. The prior website review records the published terms and robots checks.
+The website is the source. Its [FAQ](https://www.quotationspage.com/faq.php) describes restrictions on copying large portions; the quotations and compilation are not this project's original work. See SITE_REVIEW.md for the recorded review.
